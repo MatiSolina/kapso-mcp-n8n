@@ -6,7 +6,7 @@ import type {
 	IWebhookResponseData,
 } from 'n8n-workflow';
 import { NodeConnectionTypes } from 'n8n-workflow';
-import { createHmac } from 'crypto';
+import { createHmac } from 'node:crypto';
 
 export class KapsoTrigger implements INodeType {
 	description: INodeTypeDescription = {
