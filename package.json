@@ -1,6 +1,6 @@
 {
     "name": "n8n-nodes-kapso",
-    "version": "0.1.3",
+    "version": "0.1.4",
     "description": "n8n community node for Kapso AI - WhatsApp Cloud API integration",
     "license": "MIT",
     "homepage": "https://kapso.ai",
