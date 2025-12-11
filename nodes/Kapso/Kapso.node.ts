@@ -11,6 +11,28 @@ import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 const MCP_BASE_URL = 'https://app.kapso.ai/mcp';
 
+function validatePhoneNumber(phone: string): string | null {
+	if (phone && !/^\+?[1-9]\d{6,14}$/.test(phone.replace(/[\s-]/g, ''))) {
+		return `Invalid phone number format: "${phone}". Use international format like +15551234567`;
+	}
+	return null;
+}
+
+function validateUrl(url: string, fieldName: string): string | null {
+	if (url && !/^https?:\/\/.+/.test(url)) {
+		return `Invalid ${fieldName}: "${url}". URL must start with http:// or https://`;
+	}
+	return null;
+}
+
+function parseJsonSafely(json: string, fieldName: string): { data?: unknown; error?: string } {
+	try {
+		return { data: JSON.parse(json) };
+	} catch {
+		return { error: `Invalid JSON in ${fieldName}. Please check your JSON syntax. Example: {"key": "value"}` };
+	}
+}
+
 export class Kapso implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Kapso',
@@ -698,6 +720,11 @@ export class Kapso implements INodeType {
 						const conversationId = this.getNodeParameter('conversationId', i, '') as string;
 						const phone = this.getNodeParameter('phone', i, '') as string;
 						const body = this.getNodeParameter('body', i) as string;
+						const phoneError = validatePhoneNumber(phone);
+						if (phoneError) throw new NodeOperationError(this.getNode(), phoneError, { itemIndex: i });
+						if (!conversationId && !phone) {
+							throw new NodeOperationError(this.getNode(), 'Either Conversation ID or Phone Number is required', { itemIndex: i });
+						}
 						if (conversationId) toolArgs.conversation_id = conversationId;
 						if (phone) toolArgs.phone = phone;
 						toolArgs.body = body;
@@ -708,9 +735,13 @@ export class Kapso implements INodeType {
 						const templateNameRaw = this.getNodeParameter('templateName', i) as { value: string } | string;
 						const templateName = typeof templateNameRaw === 'string' ? templateNameRaw : templateNameRaw.value;
 						const templateParams = this.getNodeParameter('templateParams', i, '{}') as string;
+						const phoneErr = validatePhoneNumber(phone);
+						if (phoneErr) throw new NodeOperationError(this.getNode(), phoneErr, { itemIndex: i });
+						const paramsResult = parseJsonSafely(templateParams, 'Template Parameters');
+						if (paramsResult.error) throw new NodeOperationError(this.getNode(), paramsResult.error, { itemIndex: i });
 						if (phone) toolArgs.phone = phone;
 						toolArgs.template_name = templateName;
-						toolArgs.parameters = JSON.parse(templateParams);
+						toolArgs.parameters = paramsResult.data;
 					}
 					if (operation === 'sendMedia') {
 						toolName = 'whatsapp_send_media';
@@ -719,6 +750,13 @@ export class Kapso implements INodeType {
 						const mediaType = this.getNodeParameter('mediaType', i) as string;
 						const mediaUrl = this.getNodeParameter('mediaUrl', i) as string;
 						const caption = this.getNodeParameter('caption', i, '') as string;
+						const phoneErrMedia = validatePhoneNumber(phone);
+						if (phoneErrMedia) throw new NodeOperationError(this.getNode(), phoneErrMedia, { itemIndex: i });
+						const urlError = validateUrl(mediaUrl, 'Media URL');
+						if (urlError) throw new NodeOperationError(this.getNode(), urlError, { itemIndex: i });
+						if (!conversationId && !phone) {
+							throw new NodeOperationError(this.getNode(), 'Either Conversation ID or Phone Number is required', { itemIndex: i });
+						}
 						if (conversationId) toolArgs.conversation_id = conversationId;
 						if (phone) toolArgs.phone = phone;
 						toolArgs.media_type = mediaType;
@@ -732,11 +770,18 @@ export class Kapso implements INodeType {
 						const interactiveType = this.getNodeParameter('interactiveType', i) as string;
 						const bodyText = this.getNodeParameter('bodyText', i) as string;
 						const interactiveData = this.getNodeParameter('interactiveData', i) as string;
+						const phoneErrInt = validatePhoneNumber(phone);
+						if (phoneErrInt) throw new NodeOperationError(this.getNode(), phoneErrInt, { itemIndex: i });
+						if (!conversationId && !phone) {
+							throw new NodeOperationError(this.getNode(), 'Either Conversation ID or Phone Number is required', { itemIndex: i });
+						}
+						const intDataResult = parseJsonSafely(interactiveData, 'Interactive Data');
+						if (intDataResult.error) throw new NodeOperationError(this.getNode(), intDataResult.error, { itemIndex: i });
 						if (conversationId) toolArgs.conversation_id = conversationId;
 						if (phone) toolArgs.phone = phone;
 						toolArgs.interactive_type = interactiveType;
 						toolArgs.body_text = bodyText;
-						toolArgs.interactive_data = JSON.parse(interactiveData);
+						toolArgs.interactive_data = intDataResult.data;
 					}
 				}
 
