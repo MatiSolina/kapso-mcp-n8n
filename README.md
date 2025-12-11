@@ -12,6 +12,32 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 npm install n8n-nodes-kapso
 ```
 
+## Nodes
+
+This package includes two nodes:
+
+### Kapso Node
+The main node for interacting with Kapso's WhatsApp Cloud API - send messages, manage conversations, customers, and more.
+
+### Kapso Trigger Node
+A webhook trigger node that listens for incoming Kapso events like new messages, message status updates, and conversation events.
+
+**Supported Events:**
+- `whatsapp.message.received` - New incoming message
+- `whatsapp.message.sent` - Message sent confirmation
+- `whatsapp.message.delivered` - Message delivered
+- `whatsapp.message.read` - Message read by recipient
+- `whatsapp.message.failed` - Message failed to send
+- `whatsapp.conversation.created` - New conversation started
+- `whatsapp.conversation.ended` - Conversation ended
+- `whatsapp.conversation.inactive` - Conversation became inactive
+
+**Features:**
+- Event filtering - select which events trigger the workflow
+- Signature verification - optional HMAC SHA256 webhook signature validation
+
+---
+
 ## Operations
 
 This node provides **23 operations** matching the Kapso MCP server capabilities:
