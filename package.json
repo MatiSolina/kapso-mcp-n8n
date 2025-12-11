@@ -38,7 +38,8 @@
             "dist/credentials/KapsoApi.credentials.js"
         ],
         "nodes": [
-            "dist/nodes/Kapso/Kapso.node.js"
+            "dist/nodes/Kapso/Kapso.node.js",
+            "dist/nodes/Kapso/KapsoTrigger.node.js"
         ]
     },
     "devDependencies": {

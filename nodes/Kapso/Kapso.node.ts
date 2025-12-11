@@ -1,6 +1,8 @@
 import type {
 	IExecuteFunctions,
+	ILoadOptionsFunctions,
 	INodeExecutionData,
+	INodeListSearchResult,
 	INodeType,
 	INodeTypeDescription,
 	IHttpRequestMethods,
@@ -13,7 +15,7 @@ export class Kapso implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Kapso',
 		name: 'kapso',
-		icon: 'file:kapso.svg',
+		icon: { light: 'file:kapso.svg', dark: 'file:kapso.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
@@ -229,11 +231,29 @@ export class Kapso implements INodeType {
 			{
 				displayName: 'Template Name',
 				name: 'templateName',
-				type: 'string',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
 				required: true,
-				default: '',
 				displayOptions: { show: { resource: ['whatsappMessage'], operation: ['sendTemplate'] } },
 				description: 'Name of the approved template to send',
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						placeholder: 'Select a template...',
+						typeOptions: {
+							searchListMethod: 'searchTemplates',
+							searchable: true,
+						},
+					},
+					{
+						displayName: 'By Name',
+						name: 'name',
+						type: 'string',
+						placeholder: 'e.g. order_confirmation',
+					},
+				],
 			},
 			{
 				displayName: 'Template Parameters (JSON)',
@@ -321,12 +341,29 @@ export class Kapso implements INodeType {
 
 			// WhatsApp Inbox Fields
 			{
-				displayName: 'Host Number ID',
+				displayName: 'Host Number',
 				name: 'hostNumberId',
-				type: 'string',
-				default: '',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
 				displayOptions: { show: { resource: ['whatsappInbox'], operation: ['view'] } },
-				description: 'The host number ID to view inbox for',
+				description: 'The WhatsApp host number to view inbox for',
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						placeholder: 'Select a host number...',
+						typeOptions: {
+							searchListMethod: 'searchWhatsAppConfigs',
+						},
+					},
+					{
+						displayName: 'By ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 123456789012345',
+					},
+				],
 			},
 			{
 				displayName: 'Message IDs',
@@ -448,20 +485,58 @@ export class Kapso implements INodeType {
 			{
 				displayName: 'Customer ID',
 				name: 'customerId',
-				type: 'string',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
 				required: true,
-				default: '',
 				displayOptions: { show: { resource: ['customer'], operation: ['listConfigs'] } },
+				description: 'The customer to get configs for',
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						placeholder: 'Select a customer...',
+						typeOptions: {
+							searchListMethod: 'searchCustomers',
+							searchable: true,
+						},
+					},
+					{
+						displayName: 'By ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. cust_abc123',
+					},
+				],
 			},
 
 			// Setup Link Fields
 			{
 				displayName: 'Customer ID',
 				name: 'setupLinkCustomerId',
-				type: 'string',
+				type: 'resourceLocator',
+				default: { mode: 'list', value: '' },
 				required: true,
-				default: '',
 				displayOptions: { show: { resource: ['setupLink'] } },
+				description: 'The customer to create/manage setup links for',
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						placeholder: 'Select a customer...',
+						typeOptions: {
+							searchListMethod: 'searchCustomers',
+							searchable: true,
+						},
+					},
+					{
+						displayName: 'By ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. cust_abc123',
+					},
+				],
 			},
 			{
 				displayName: 'Setup Link ID',
@@ -473,6 +548,132 @@ export class Kapso implements INodeType {
 				description: 'The setup link ID to revoke',
 			},
 		],
+	};
+
+	methods = {
+		listSearch: {
+			async searchTemplates(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				const responseData = await this.helpers.httpRequestWithAuthentication.call(
+					this,
+					'kapsoApi',
+					{
+						method: 'POST' as IHttpRequestMethods,
+						url: MCP_BASE_URL,
+						body: {
+							jsonrpc: '2.0',
+							id: Date.now(),
+							method: 'tools/call',
+							params: {
+								name: 'whatsapp_templates',
+								arguments: { search: filter || '', response_format: 'detailed' },
+							},
+						},
+						json: true,
+					},
+				);
+
+				const templates = responseData.result?.content?.[0]?.text || '[]';
+				let parsedTemplates: Array<{ name: string; language?: string; status?: string }> = [];
+
+				try {
+					const parsed = JSON.parse(templates);
+					parsedTemplates = Array.isArray(parsed) ? parsed : parsed.templates || [];
+				} catch {
+					parsedTemplates = [];
+				}
+
+				return {
+					results: parsedTemplates.map((template) => ({
+						name: template.name + (template.language ? ` (${template.language})` : ''),
+						value: template.name,
+					})),
+				};
+			},
+
+			async searchCustomers(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				const responseData = await this.helpers.httpRequestWithAuthentication.call(
+					this,
+					'kapsoApi',
+					{
+						method: 'POST' as IHttpRequestMethods,
+						url: MCP_BASE_URL,
+						body: {
+							jsonrpc: '2.0',
+							id: Date.now(),
+							method: 'tools/call',
+							params: {
+								name: 'platform_list_customers',
+								arguments: { search: filter || '', response_format: 'detailed' },
+							},
+						},
+						json: true,
+					},
+				);
+
+				const customersText = responseData.result?.content?.[0]?.text || '[]';
+				let customers: Array<{ id: string; name: string }> = [];
+
+				try {
+					const parsed = JSON.parse(customersText);
+					customers = Array.isArray(parsed) ? parsed : parsed.customers || [];
+				} catch {
+					customers = [];
+				}
+
+				return {
+					results: customers.map((customer) => ({
+						name: customer.name,
+						value: customer.id,
+					})),
+				};
+			},
+
+			async searchWhatsAppConfigs(
+				this: ILoadOptionsFunctions,
+			): Promise<INodeListSearchResult> {
+				const responseData = await this.helpers.httpRequestWithAuthentication.call(
+					this,
+					'kapsoApi',
+					{
+						method: 'POST' as IHttpRequestMethods,
+						url: MCP_BASE_URL,
+						body: {
+							jsonrpc: '2.0',
+							id: Date.now(),
+							method: 'tools/call',
+							params: {
+								name: 'whatsapp_configs_overview',
+								arguments: { response_format: 'detailed' },
+							},
+						},
+						json: true,
+					},
+				);
+
+				const configsText = responseData.result?.content?.[0]?.text || '[]';
+				let configs: Array<{ id: string; phone_number?: string; display_name?: string }> = [];
+
+				try {
+					const parsed = JSON.parse(configsText);
+					configs = Array.isArray(parsed) ? parsed : parsed.configs || [];
+				} catch {
+					configs = [];
+				}
+
+				return {
+					results: configs.map((config) => ({
+						name: config.display_name || config.phone_number || config.id,
+						value: config.id,
+					})),
+				};
+			},
+		},
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
@@ -504,7 +705,8 @@ export class Kapso implements INodeType {
 					if (operation === 'sendTemplate') {
 						toolName = 'whatsapp_send_template';
 						const phone = this.getNodeParameter('phone', i, '') as string;
-						const templateName = this.getNodeParameter('templateName', i) as string;
+						const templateNameRaw = this.getNodeParameter('templateName', i) as { value: string } | string;
+						const templateName = typeof templateNameRaw === 'string' ? templateNameRaw : templateNameRaw.value;
 						const templateParams = this.getNodeParameter('templateParams', i, '{}') as string;
 						if (phone) toolArgs.phone = phone;
 						toolArgs.template_name = templateName;
@@ -551,7 +753,8 @@ export class Kapso implements INodeType {
 				if (resource === 'whatsappInbox') {
 					if (operation === 'view') {
 						toolName = 'whatsapp_inbox';
-						const hostNumberId = this.getNodeParameter('hostNumberId', i, '') as string;
+						const hostNumberIdRaw = this.getNodeParameter('hostNumberId', i, { value: '' }) as { value: string } | string;
+						const hostNumberId = typeof hostNumberIdRaw === 'string' ? hostNumberIdRaw : hostNumberIdRaw.value;
 						if (hostNumberId) toolArgs.host_number_id = hostNumberId;
 					}
 					if (operation === 'markRead') {
@@ -631,13 +834,15 @@ export class Kapso implements INodeType {
 					}
 					if (operation === 'listConfigs') {
 						toolName = 'platform_list_customer_configs';
-						toolArgs.customer_id = this.getNodeParameter('customerId', i) as string;
+						const customerIdRaw = this.getNodeParameter('customerId', i) as { value: string } | string;
+						toolArgs.customer_id = typeof customerIdRaw === 'string' ? customerIdRaw : customerIdRaw.value;
 					}
 				}
 
 				// ==================== Setup Link ====================
 				if (resource === 'setupLink') {
-					const customerId = this.getNodeParameter('setupLinkCustomerId', i) as string;
+					const customerIdRaw = this.getNodeParameter('setupLinkCustomerId', i) as { value: string } | string;
+					const customerId = typeof customerIdRaw === 'string' ? customerIdRaw : customerIdRaw.value;
 					toolArgs.customer_id = customerId;
 
 					if (operation === 'generate') {
