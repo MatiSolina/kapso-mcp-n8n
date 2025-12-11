@@ -1,0 +1,18 @@
+{
+	"node": "n8n-nodes-kapso.kapso",
+	"nodeVersion": "1.0",
+	"codexVersion": "1.0",
+	"categories": ["Communication", "Marketing & Content"],
+	"resources": {
+		"credentialDocumentation": [
+			{
+				"url": "https://docs.kapso.ai/docs/api/getting-started"
+			}
+		],
+		"primaryDocumentation": [
+			{
+				"url": "https://docs.kapso.ai/docs/mcp/introduction"
+			}
+		]
+	}
+}
